@@ -9,6 +9,9 @@ import userRoutes from './routes/users.js'
 import leaveRoutes from './routes/leaves.js'
 import publicRoutes from './routes/public.js'
 import chatRoutes from './routes/chat.js'
+import companyRoutes from './routes/companies.js'
+import attendanceRoutes from './routes/attendance.js'
+import payslipRoutes from './routes/payslips.js'
 
 const app = express()
 app.set('trust proxy', 1) // Vercel proxy ke peeche rate-limit sahi IP dekhe
@@ -25,7 +28,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 )
-app.use(express.json({ limit: '50kb' }))
+app.use(express.json({ limit: '8mb' }))
 
 app.get('/', (req, res) => res.json({ name: 'Human Health Management API', ok: true }))
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }))
@@ -41,6 +44,9 @@ app.use('/api/users', userRoutes)
 app.use('/api/leaves', leaveRoutes)
 app.use('/api', publicRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/companies', companyRoutes)
+app.use('/api/attendance', attendanceRoutes)
+app.use('/api/payslips', payslipRoutes)
 
 app.use((req, res) => res.status(404).json({ message: 'Not found' }))
 // eslint-disable-next-line no-unused-vars

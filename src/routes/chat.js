@@ -5,33 +5,34 @@ import { validate } from '../middleware/validate.js'
 
 const router = Router()
 router.use(rateLimit({ windowMs: 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false }))
-
-const SYSTEM = 'You are the friendly assistant of Human Health Management, a workplace people-management portal (employees, HR managers, admins). Answer briefly (max 4 sentences). Do not give medical diagnoses.'
-const demoReply = 'I am in demo mode right now. Set GROQ_API_KEY on the backend to enable AI answers.'
+const SYSTEM = 'You are the friendly assistant of Human Health Management, a workplace people-management portal for employees, HR managers, and admins. Answer clearly and briefly (maximum 4 sentences). Do not give medical diagnoses.'
+const demoReply = 'The AI assistant is not configured yet. Please try again later.'
 
 router.post('/', validate(z.object({ message: z.string().trim().min(1).max(1000) })), async (req, res) => {
-  const key = process.env.GROQ_API_KEY
-  if (!key) return res.json({ reply: demoReply, demo: true })
+  const key = process.env.GEMINI_API_KEY
+  if (!key) return res.status(503).json({ message: 'AI assistant is not configured. Add GEMINI_API_KEY in the backend environment settings.' })
   try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.CHAT_MODEL || 'llama-3.3-70b-versatile',
-        max_tokens: 400,
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: req.body.message }
-        ]
+        systemInstruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: 'user', parts: [{ text: req.body.message }] }],
+        generationConfig: { maxOutputTokens: 500, temperature: 0.6 }
       })
     })
-    if (!r.ok) throw new Error(`AI provider ${r.status}`)
-    const data = await r.json()
-    res.json({ reply: data.choices?.[0]?.message?.content || demoReply })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) {
+      console.error('Gemini provider error:', r.status, data.error?.message || '')
+      return res.status(502).json({ message: 'AI provider request failed. Check GEMINI_API_KEY and GEMINI_MODEL.' })
+    }
+    const reply = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim()
+    if (!reply) return res.status(502).json({ message: 'The AI assistant returned an empty response.' })
+    res.json({ reply })
   } catch (e) {
     console.error('chat error', e.message)
     res.status(502).json({ message: 'Assistant is unavailable right now' })
   }
 })
-
 export default router
